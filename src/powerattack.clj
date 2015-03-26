@@ -21,6 +21,12 @@
   (observe! [random die]
     (-> random .nextInt (mod die) inc)))
 
+(def maximizer
+  (reify
+    Observer
+    (observe! [_ die]
+      die)))
+
 (defprotocol Observable
   (observe [this context]))
 
@@ -46,6 +52,9 @@
           (recur next-pool (dec number-left)))))))
 
 (defrecord FixedDamage [value type]
+  Object
+  (toString [_]
+    (str value (when type " ") type))
   Observable
   (observe [this _] this))
 
@@ -84,9 +93,9 @@
         (assoc damage :type (second expr))))
 
 (defn eval-damage
-  [s]
-  (let [exprs (parse-damage s)
-        damages (map (partial reduce reduce-damage-expr) exprs)
-        observer (java.security.SecureRandom.)
-        actuals (map #(observe % observer) damages)]
-    (prn (sum-damages actuals))))
+  ([s] (eval-damage (java.security.SecureRandom.) s))
+  ([observer s]
+     (let [exprs (parse-damage s)
+           damages (map (partial reduce reduce-damage-expr) exprs)
+           actuals (map #(observe % observer) damages)]
+       (prn (sum-damages actuals)))))
