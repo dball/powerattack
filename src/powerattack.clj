@@ -99,3 +99,49 @@
            damages (map (partial reduce reduce-damage-expr) exprs)
            actuals (map #(observe % observer) damages)]
        (prn (sum-damages actuals)))))
+
+(def attack-grammar
+  "<expr> = (count <ws+>)? desc <ws+> bonus (<ws+> type)? <ws+>
+            (<'('> damage <')'> | damage)
+   count = number
+   <number> = #'[1-9][0-9]*'
+   ws = #'\\s+'
+   desc = #'\\w+'
+   bonus = <'+'?> number
+   type = #'\\w+'
+   damage = #'\\d[^)]+'")
+
+(def parse-attack
+  (insta/parser attack-grammar))
+
+(defprotocol Attackable
+  (attack! [this attack]))
+
+(defrecord Critical [range multiplier])
+
+(defrecord Attack [desc bonus damage critical]
+  Observable
+  (observe [this observer]
+    (let [roll (observe! observer 20)
+          critical? (critical-range roll)])
+    (assoc this :roll roll :critical? critical)))
+
+(defrecord Target [lowest-ac-hit
+                   highest-ac-missed
+                   damage-resistance
+                   energy-resistances
+                   immune-to-critical-hits?]
+  Attackable
+  (attack! [_ attack]
+    (let [{:keys [desc bonus damages roll]} attack]
+      (let [to-hit (+ bonus roll)
+            outcome (cond (or (= 20 roll)
+                              (and lowest-ac-hit
+                                   (>= to-hit lowest-ac-hit)))
+                          :hit
+                          (or (= 1 roll)
+                              (and highest-ac-missed
+                                   (<= to-hit highest-ac-missed)))
+                          :miss
+                          :else
+                          :unknown)]))))
